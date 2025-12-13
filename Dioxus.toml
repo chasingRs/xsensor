@@ -1,0 +1,27 @@
+[application]
+
+[web.app]
+
+# HTML title tag content
+title = "xsensor"
+name = "xsensor"
+
+# include `assets` in web platform
+[web.resource]
+
+# Additional CSS style files
+style = []
+
+# Additional JavaScript files
+script = []
+
+[web.resource.dev]
+
+# Javascript code file
+# serve: [dev-server] only
+script = []
+
+[bundle]
+identifier = "com.pkjifinity.com"
+publisher = "pkjinfinity"
+icon = ["assets/favicon.ico"]

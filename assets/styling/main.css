@@ -1,0 +1,21 @@
+body {
+    background-color: #0f1116;
+    color: #ffffff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0px;
+}
+
+@keyframes ripple {
+    0% {
+        box-shadow: 0 0 0 0 var(--ripple-color);
+        opacity: 0.8;
+    }
+    100% {
+        box-shadow: 0 0 0 30px var(--ripple-color);
+        opacity: 0;
+    }
+}
+
+.animate-ripple {
+    animation: ripple 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
