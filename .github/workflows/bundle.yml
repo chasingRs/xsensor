@@ -10,35 +10,62 @@ permissions:
 
 jobs:
   bundle-desktop:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    env:
+      BUNDLE_DIR: target/release/bundle
+      BUNDLE_ARCHIVE: ${{ github.event.repository.name }}-bundle.tar.gz
+      BUNDLE_ARTIFACT_NAME: ${{ github.event.repository.name }}-desktop-bundle
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
+      - name: Cache cargo registries and binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: dioxus-cli-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-          sudo apt-get install -y libwebkit2gtk-4.1-dev || sudo apt-get install -y libwebkit2gtk-4.0-dev
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libwebkit2gtk-4.0-dev \
+            libssl-dev
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install Dioxus CLI
-        run: cargo install dioxus-cli --locked
+        run: cargo install dioxus-cli --locked --force
 
       - name: Bundle desktop release
         run: dx bundle --platform desktop --release
 
+      - name: Package bundles
+        run: |
+          if [ ! -d "$BUNDLE_DIR" ]; then
+            echo "Bundle failed: directory $BUNDLE_DIR not created. Check the 'Bundle desktop release' step logs."
+            exit 1
+          fi
+          if ! tar -czf "$BUNDLE_ARCHIVE" -C "$BUNDLE_DIR" --exclude='.*' .; then
+            echo "Archiving bundle failed. Verify bundle contents and rerun."
+            exit 1
+          fi
+
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: xsensor-desktop-bundle
-          path: target/release/bundle
+          name: ${{ env.BUNDLE_ARTIFACT_NAME }}
+          path: ${{ env.BUNDLE_ARCHIVE }}
 
       - name: Attach bundle to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            target/release/bundle/**/*
+          files: ${{ env.BUNDLE_ARCHIVE }}
