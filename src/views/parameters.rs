@@ -1,5 +1,5 @@
 use crate::api::ble_service::use_ble;
-use crate::context::use_connected_device;
+use crate::context::use_app_state;
 use dioxus::prelude::*;
 
 const SERVICE_UUID: &str = "0000ffe0-0000-1000-8000-00805f9b34fb";
@@ -9,9 +9,9 @@ const ACC_THRESHOLD_UUID: &str = "0000ffe3-0000-1000-8000-00805f9b34fb";
 
 #[component]
 pub fn Parameters() -> Element {
-    let connected_device = use_connected_device();
+    let app_state = use_app_state();
     let ble = use_ble();
-    let device_id = connected_device.id.read().clone();
+    let device_id = app_state.connected_device_id.read().clone();
     let device_id_for_effect = device_id.clone();
     let device_id_for_save = device_id.clone();
     let device_id_for_reset = device_id.clone();
@@ -241,7 +241,7 @@ fn ParametersHeader(
                     class: if has_changes { "inline-flex items-center gap-2 rounded-lg bg-[#60cd18] hover:bg-[#6fe12a] cursor-pointer px-3 py-1.5 text-xs font-medium text-gray-900 transition-colors" } else { "inline-flex items-center gap-2 rounded-lg bg-[#2a2a2a] px-3 py-1.5 text-xs font-medium text-gray-500 cursor-not-allowed" },
                     disabled: !has_changes,
                     onclick: move |_| on_save.call(()),
-                    "保存到设备"
+                    "保存"
                 }
             }
         }
@@ -255,15 +255,15 @@ fn ThresholdPairCard(
     on_low_change: EventHandler<i32>,
     on_high_change: EventHandler<i32>,
 ) -> Element {
-    let percentage_low = (low_value as f64 / 4096.0 * 100.0) as i32;
-    let percentage_high = (high_value as f64 / 4096.0 * 100.0) as i32;
+    let percentage_low = (low_value as f64 / 2047.0 * 100.0) as i32;
+    let percentage_high = (high_value as f64 / 2047.0 * 100.0) as i32;
 
     rsx! {
         div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4 space-y-4",
             div {
                 h2 { class: "text-base font-medium mb-1", "PS 传感器阈值对" }
                 p { class: "text-xs text-gray-400",
-                    "设置接近传感器的高低阈值范围 (0-4096)"
+                    "设置接近传感器的高低阈值范围 (0-2047)"
                 }
                 p { class: "text-[10px] text-gray-500 mt-0.5",
                     "UUID: 0xFFE1 (高阈值), 0xFFE2 (低阈值)"
@@ -273,8 +273,9 @@ fn ThresholdPairCard(
             div { class: "space-y-4",
                 // 低阈值
                 ThresholdSlider {
-                    label: "PS 低阈值",
+                    label: "低阈值",
                     value: low_value,
+                    max_value: 2047,
                     percentage: percentage_low,
                     color: "blue",
                     on_change: on_low_change,
@@ -282,8 +283,9 @@ fn ThresholdPairCard(
 
                 // 高阈值
                 ThresholdSlider {
-                    label: "PS 高阈值",
+                    label: "高阈值",
                     value: high_value,
+                    max_value: 2047,
                     percentage: percentage_high,
                     color: "red",
                     on_change: on_high_change,
@@ -295,21 +297,22 @@ fn ThresholdPairCard(
 
 #[component]
 fn AccelThresholdCard(value: i32, on_change: EventHandler<i32>) -> Element {
-    let percentage = (value as f64 / 4096.0 * 100.0) as i32;
+    let percentage = (value as f64 / 40.0 * 100.0) as i32;
 
     rsx! {
         div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4 space-y-4",
             div {
                 h2 { class: "text-base font-medium mb-1", "ACC 传感器阈值" }
                 p { class: "text-xs text-gray-400",
-                    "设置加速度传感器的中断触发阈值 (0-4096)"
+                    "设置加速度传感器的中断触发阈值 (0-40)"
                 }
                 p { class: "text-[10px] text-gray-500 mt-0.5", "UUID: 0xFFE3" }
             }
 
             ThresholdSlider {
-                label: "ACC 中断阈值",
+                label: "加速度计中断阈值",
                 value,
+                max_value: 40,
                 percentage,
                 color: "purple",
                 on_change,
@@ -322,6 +325,7 @@ fn AccelThresholdCard(value: i32, on_change: EventHandler<i32>) -> Element {
 fn ThresholdSlider(
     label: String,
     value: i32,
+    max_value: i32,
     percentage: i32,
     color: &'static str,
     on_change: EventHandler<i32>,
@@ -336,18 +340,18 @@ fn ThresholdSlider(
                     input {
                         r#type: "number",
                         min: "0",
-                        max: "4096",
+                        max: "{max_value}",
                         value: "{value}",
                         class: "w-20 px-2 py-1 text-sm font-semibold {text_color} bg-[#2a2a2a] border border-[#3a3a3a] rounded text-right focus:outline-none focus:border-[#60cd18]",
                         oninput: move |evt| {
                             if let Ok(val) = evt.value().parse::<i32>() {
-                                if val >= 0 && val <= 4096 {
+                                if val >= 0 && val <= max_value {
                                     on_change.call(val);
                                 }
                             }
                         },
                     }
-                    span { class: "text-sm text-gray-500", "/ 4096" }
+                    span { class: "text-sm text-gray-500", "/ {max_value}" }
                 }
             }
 
@@ -355,7 +359,7 @@ fn ThresholdSlider(
                 input {
                     r#type: "range",
                     min: "0",
-                    max: "4096",
+                    max: "{max_value}",
                     value: "{value}",
                     class: "flex-1 h-2 rounded-lg appearance-none cursor-pointer {slider_color}",
                     oninput: move |evt| {

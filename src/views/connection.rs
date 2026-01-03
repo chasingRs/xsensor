@@ -1,6 +1,6 @@
 use crate::api::ble_service::use_ble;
 use crate::api::{UiCharacteristic, UiDevice, UiService};
-use crate::context::use_connected_device;
+use crate::context::use_app_state;
 use dioxus::prelude::*;
 use futures::StreamExt;
 use std::collections::{HashMap, HashSet};
@@ -9,13 +9,12 @@ const SERVICE_UUID: &str = "0000ffe0-0000-1000-8000-00805f9b34fb";
 
 #[component]
 pub fn Connection() -> Element {
-    let connected_device = use_connected_device();
+    let mut app_state = use_app_state();
     let ble = use_ble();
-    let mut poll_trigger = use_signal(|| 0);
+    
     let expanded_devices = use_signal(HashSet::<String>::new);
     let loading_services = use_signal(HashSet::<String>::new);
     let device_services = use_signal(HashMap::<String, Vec<UiService>>::new);
-    let mut is_scanning = use_signal(|| false);
     let mut adapter_available = use_signal(|| true);
     let mut manual_disconnect = use_signal(|| false);
 
@@ -25,25 +24,25 @@ pub fn Connection() -> Element {
         }
     });
 
-    let devices_resource = use_resource(move || async move {
-        let _ = poll_trigger();
 
-        let devices_list = ble.get_devices().await;
-        info!("{}", devices_list.len());
-        devices_list
-    });
 
     let connect_task = use_coroutine(move |mut rx: UnboundedReceiver<String>| {
         let ble = ble.clone();
         async move {
             while let Some(dev_id) = rx.next().await {
+                if (app_state.is_scanning)() {
+                    let _ = ble.stop_scan().await;
+                    app_state.is_scanning.set(false);
+                }
+
+                app_state.is_connecting.set(true);
                 if let Err(e) = ble.connect(dev_id.clone()).await {
                     error!("Failed to connect to device: {}", e.to_string());
                 } else {
-                    let mut id = connected_device.id;
-                    id.set(dev_id);
-                    poll_trigger += 1;
+                    app_state.connected_device_id.set(dev_id);
+                    app_state.scanned_devices.set(ble.get_devices().await);
                 }
+                app_state.is_connecting.set(false);
             }
         }
     });
@@ -55,49 +54,69 @@ pub fn Connection() -> Element {
                 if let Err(e) = ble.disconnect(dev_id.clone()).await {
                     error!("Failed to disconnect device: {}", e.to_string());
                 } else {
-                    let mut id = connected_device.id;
-                    id.set(String::new());
-                    poll_trigger += 1;
+                    app_state.connected_device_id.set(String::new());
+                    app_state.scanned_devices.set(ble.get_devices().await);
                 }
             }
         }
     });
 
-    // 自动连接逻辑
-    use_effect(move || {
-        if manual_disconnect() {
-            return;
-        }
-        if let Some(devices) = devices_resource.read().as_ref() {
-            if connected_device.id.read().is_empty() {
-                for dev in devices {
-                    if dev.name.to_lowercase().contains("proximity sensor") {
-                        let dev_id = dev.id.clone();
-                        info!("Auto connecting to device: {}", dev_id);
-                        connect_task.send(dev_id);
-                        break; // 只连接第一个匹配的设备
-                    }
-                }
-            }
-        }
-    });
-
+    let connect_task_clone = connect_task.clone();
     let scan_task = use_coroutine(move |mut rx: UnboundedReceiver<()>| {
         let ble = ble.clone();
+        let connect_task = connect_task_clone.clone();
         async move {
             while let Some(_) = rx.next().await {
-                is_scanning.set(true);
-                let _ = ble.scan().await;
-                poll_trigger.set(poll_trigger() + 1);
-                is_scanning.set(false);
+                app_state.is_scanning.set(true);
+                match ble.scan().await {
+                    Ok(mut stream) => {
+                        let timeout = tokio::time::sleep(std::time::Duration::from_secs(8));
+                        tokio::pin!(timeout);
+                        loop {
+                            tokio::select! {
+                                _ = &mut timeout => {
+                                    break;
+                                }
+                                Some(new_devices) = stream.next() => {
+                                    if app_state.connected_device_id.read().is_empty() && !*app_state.is_connecting.read() {
+                                        if let Some(target) = new_devices.iter().find(|d| d.services.contains(&SERVICE_UUID.to_string())) {
+                                            info!("Found target device {}, auto-connecting...", target.name);
+                                            connect_task.send(target.id.clone());
+                                            break;
+                                        }
+                                    }
+                                    app_state.scanned_devices.set(new_devices);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => error!("Scan failed: {}", e),
+                }
+                let _ = ble.stop_scan().await;
+                app_state.is_scanning.set(false);
             }
         }
+    });
+
+    let ble_init = ble.clone();
+    let scan_task_init = scan_task.clone();
+    use_effect(move || {
+        // Auto-refresh device list on entry
+        scan_task_init.send(());
+        
+        spawn(async move {
+            if app_state.scanned_devices.read().is_empty() {
+                app_state.scanned_devices.set(ble_init.get_devices().await);
+            }
+        });
     });
 
     use_future(move || async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-            poll_trigger += 1;
+            if !(app_state.is_scanning)() && !(app_state.is_connecting)() {
+                app_state.scanned_devices.set(ble.get_devices().await);
+            }
         }
     });
     rsx! {
@@ -121,14 +140,15 @@ pub fn Connection() -> Element {
                     }
                 }
                 ConnectionHeader {
-                    is_scanning: is_scanning(),
+                    is_scanning: (app_state.is_scanning)(),
                     on_scan: move |_| {
                         scan_task.send(());
                     },
                 }
 
-                match &*devices_resource.read() {
-                    Some(devices) => rsx! {
+                {
+                    let devices = app_state.scanned_devices.read();
+                    rsx! {
                         if devices.is_empty() {
                             div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-6 text-gray-400 text-sm",
                                 "未发现设备，尝试重新扫描。"
@@ -136,12 +156,15 @@ pub fn Connection() -> Element {
                         } else {
                             DeviceList {
                                 devices: devices.clone(),
+                                connected_device_id: app_state.connected_device_id.read().clone(),
                                 expanded_devices,
                                 loading_services,
                                 device_services,
                                 on_connect: move |dev_id: String| {
-                                    manual_disconnect.set(false);
-                                    connect_task.send(dev_id);
+                                    if !(app_state.is_connecting)() {
+                                        manual_disconnect.set(false);
+                                        connect_task.send(dev_id);
+                                    }
                                 },
                                 on_disconnect: {
                                     let mut expanded_devices = expanded_devices.clone();
@@ -192,12 +215,7 @@ pub fn Connection() -> Element {
                                 },
                             }
                         }
-                    },
-                    None => rsx! {
-                        div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-6 text-sm text-gray-300",
-                            "正在扫描..."
-                        }
-                    },
+                    }
                 }
             }
         }
@@ -229,6 +247,7 @@ fn ConnectionHeader(is_scanning: bool, on_scan: EventHandler<()>) -> Element {
 #[component]
 fn DeviceList(
     devices: Vec<UiDevice>,
+    connected_device_id: String,
     expanded_devices: Signal<HashSet<String>>,
     loading_services: Signal<HashSet<String>>,
     device_services: Signal<HashMap<String, Vec<UiService>>>,
@@ -241,6 +260,7 @@ fn DeviceList(
             for dev in devices {
                 DeviceEntry {
                     device: dev.clone(),
+                    is_connected: dev.id == connected_device_id,
                     is_expanded: expanded_devices.read().contains(&dev.id),
                     loading: loading_services.read().contains(&dev.id),
                     services: device_services.read().get(&dev.id).cloned(),
@@ -256,6 +276,7 @@ fn DeviceList(
 #[component]
 fn DeviceEntry(
     device: UiDevice,
+    is_connected: bool,
     is_expanded: bool,
     loading: bool,
     services: Option<Vec<UiService>>,
@@ -270,7 +291,7 @@ fn DeviceEntry(
         .rssi
         .map(|v| format!("{v} dBm"))
         .unwrap_or_else(|| "未知".to_string());
-    let (status_label, status_class) = if device.is_connected {
+    let (status_label, status_class) = if is_connected {
         (
             "已连接",
             "bg-emerald-500/15 text-emerald-200 border border-emerald-500/30",
@@ -300,7 +321,7 @@ fn DeviceEntry(
                 span { class: format!("text-[10px] px-2 py-0.5 rounded-full {status_class}"),
                     "{status_label}"
                 }
-                if device.is_connected {
+                if is_connected {
                     div { class: "flex items-center gap-2",
                         button {
                             class: "inline-flex items-center justify-center rounded-lg bg-[#2d6cdf] hover:bg-[#3c7eff] cursor-pointer px-2.5 py-1 text-xs font-medium text-gray-100 transition-colors",

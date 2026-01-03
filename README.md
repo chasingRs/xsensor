@@ -1,59 +1,61 @@
-# Development
+# XSensor
 
-Your new jumpstart project includes basic organization with an organized `assets` folder and a `components` folder.
-If you chose to develop with the router feature, you will also have a `views` folder.
+XSensor is a desktop application built with Rust and Dioxus for monitoring and configuring BLE-based sensor devices.
+
+## Features
+
+- **BLE Connectivity**:
+  - Automatic scanning for compatible devices.
+  - **Auto-Connect**: Automatically connects to devices broadcasting the target service UUID (`0000ffe0...`).
+  - Real-time connection status and signal strength (RSSI) monitoring.
+
+- **Real-time Status**:
+  - Visualizes sensor data streams.
+  - **Smart Counting**: Implements logic to filter signal bounce and release events, ensuring accurate event counting.
+
+- **Parameter Configuration**:
+  - Read and write device parameters wirelessly.
+  - Configurable thresholds:
+    - Low Pressure Threshold
+    - High Pressure Threshold
+    - Acceleration Threshold
+
+## Tech Stack
+
+- **Language**: [Rust](https://www.rust-lang.org/)
+- **UI Framework**: [Dioxus](https://dioxuslabs.com/) (v0.7)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **BLE Library**: [btleplug](https://github.com/deviceplug/btleplug)
+
+## Project Structure
 
 ```
-project/
-├─ assets/ # Any assets that are used by the app should be placed here
-├─ src/
-│  ├─ main.rs # The entrypoint for the app. It also defines the routes for the app.
-│  ├─ components/
-│  │  ├─ mod.rs # Defines the components module
-│  │  ├─ hero.rs # The Hero component for use in the home page
-│  │  ├─ echo.rs # The echo component uses server functions to communicate with the server
-│  ├─ views/ # The views each route will render in the app.
-│  │  ├─ mod.rs # Defines the module for the views route and re-exports the components for each route
-│  │  ├─ blog.rs # The component that will render at the /blog/:id route
-│  │  ├─ home.rs # The component that will render at the / route
-├─ Cargo.toml # The Cargo.toml file defines the dependencies and feature flags for your project
+xsensor/
+├── assets/          # Static assets and compiled CSS
+├── src/
+│   ├── api/         # BLE implementation and data models
+│   ├── components/  # Reusable UI components
+│   ├── views/       # Application pages (Connection, Status, Parameters)
+│   ├── context.rs   # Global application state management
+│   └── main.rs      # Application entry point
+├── Cargo.toml       # Rust dependencies
+└── Dioxus.toml      # Dioxus configuration
 ```
 
-### Automatic Tailwind (Dioxus 0.7+)
+## Getting Started
 
-As of Dioxus 0.7, there no longer is a need to manually install tailwind. Simply `dx serve` and you're good to go!
+### Prerequisites
 
-Automatic tailwind is supported by checking for a file called `tailwind.css` in your app's manifest directory (next to Cargo.toml). To customize the file, use the dioxus.toml:
+- Rust and Cargo installed.
+- Dioxus CLI installed (`cargo install dioxus-cli`).
 
-```toml
-[application]
-tailwind_input = "my.css"
-tailwind_output = "assets/out.css"
-```
-
-### Tailwind Manual Install
-
-To use tailwind plugins or manually customize tailwind, you can can install the Tailwind CLI and use it directly.
-
-1. Install npm: https://docs.npmjs.com/downloading-and-installing-node-js-and-npm
-2. Install the Tailwind CSS CLI: https://tailwindcss.com/docs/installation/tailwind-cli
-3. Run the following command in the root of the project to start the Tailwind CSS compiler:
-
-```bash
-npx @tailwindcss/cli -i ./input.css -o ./assets/tailwind.css --watch
-```
-
-### Serving Your App
-
-Run the following command in the root of your project to start developing with the default platform:
+### Running the App
 
 ```bash
 dx serve --platform desktop
 ```
 
-To run for a different platform, use the `--platform platform` flag. E.g.
-```bash
-dx serve --platform desktop
-```
+## Development Notes
 
-
+- **Auto-Connect**: The application is configured to automatically connect to the first discovered device that advertises the service UUID `0000ffe0-0000-1000-8000-00805f9b34fb`.
+- **Counter Logic**: The status view ignores `0` values from the notification stream to prevent double-counting on button release.

@@ -6,7 +6,7 @@ use futures::Stream;
 use futures::StreamExt;
 use std::pin::Pin;
 pub enum BleRequest {
-    Scan(oneshot::Sender<Result<(), String>>),
+    Scan(oneshot::Sender<Result<Pin<Box<dyn Stream<Item = Vec<UiDevice>> + Send>>, String>>),
     GetDevices(oneshot::Sender<Vec<UiDevice>>),
     Connect(String, oneshot::Sender<Result<(), String>>),
     Disconnect(String, oneshot::Sender<Result<(), String>>),
@@ -31,6 +31,7 @@ pub enum BleRequest {
         oneshot::Sender<Result<Pin<Box<dyn Stream<Item = NotificationData> + Send>>, String>>,
     ),
     ListCharacteristics(String, oneshot::Sender<Result<Vec<UiService>, String>>),
+    StopScan(oneshot::Sender<Result<(), String>>),
 }
 
 #[derive(Clone, Copy)]
@@ -39,7 +40,7 @@ pub struct BleService {
 }
 
 impl BleService {
-    pub async fn scan(&self) -> Result<(), String> {
+    pub async fn scan(&self) -> Result<Pin<Box<dyn Stream<Item = Vec<UiDevice>> + Send>>, String> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(BleRequest::Scan(tx));
         rx.await.map_err(|_| "Channel closed".to_string())?
@@ -124,6 +125,12 @@ impl BleService {
         self.tx.send(BleRequest::ListCharacteristics(id, tx));
         rx.await.map_err(|_| "Channel closed".to_string())?
     }
+
+    pub async fn stop_scan(&self) -> Result<(), String> {
+        let (tx, rx) = oneshot::channel();
+        self.tx.send(BleRequest::StopScan(tx));
+        rx.await.map_err(|_| "Channel closed".to_string())?
+    }
 }
 
 pub fn use_ble_provider() {
@@ -132,7 +139,14 @@ pub fn use_ble_provider() {
         while let Some(msg) = rx.next().await {
             match msg {
                 BleRequest::Scan(reply) => {
-                    let _ = reply.send(manager.start_scan().await.map_err(|e| e.to_string()));
+                    match manager.start_scan_stream().await {
+                        Ok(stream) => {
+                            let _ = reply.send(Ok(Box::pin(stream)));
+                        }
+                        Err(e) => {
+                            let _ = reply.send(Err(e.to_string()));
+                        }
+                    }
                 }
                 BleRequest::GetDevices(reply) => {
                     let _ = reply.send(manager.get_devices().await.unwrap_or_default());
@@ -177,6 +191,9 @@ pub fn use_ble_provider() {
                             .await
                             .map_err(|e| e.to_string()),
                     );
+                }
+                BleRequest::StopScan(reply) => {
+                    let _ = reply.send(manager.stop_scan().await.map_err(|e| e.to_string()));
                 }
             }
         }

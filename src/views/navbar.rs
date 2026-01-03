@@ -1,5 +1,5 @@
 use crate::api::ble_service::use_ble;
-use crate::context::use_connected_device;
+use crate::context::use_app_state;
 use crate::Route;
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::fa_brands_icons::FaBluetooth;
@@ -8,23 +8,23 @@ use dioxus_free_icons::Icon;
 
 #[component]
 pub fn Navbar() -> Element {
-    let connected_device = use_connected_device();
+    let mut app_state = use_app_state();
     let ble = use_ble();
 
     // 轮询检查连接状态
     use_future(move || {
-        let mut connected_device = connected_device.clone();
         let ble = ble.clone();
         async move {
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                let current_id = connected_device.id.read().clone();
+                let current_id = app_state.connected_device_id.read().clone();
                 if !current_id.is_empty() {
                     if ble.is_connected(current_id.clone()).await {
                         // connected
                     } else {
                         // 如果检查失败，也认为断开连接
-                        connected_device.id.set(String::new());
+                        app_state.connected_device_id.set(String::new());
+                        app_state.scanned_devices.set(ble.get_devices().await);
                     }
                 }
             }

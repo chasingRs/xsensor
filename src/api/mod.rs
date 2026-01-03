@@ -11,6 +11,7 @@ pub struct UiDevice {
     pub name: String,
     pub is_connected: bool,
     pub rssi: Option<i16>,
+    pub services: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

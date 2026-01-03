@@ -50,7 +50,7 @@ fn main() {
 /// Components should be annotated with `#[component]` to support props, better error messages, and autocomplete
 #[component]
 fn App() -> Element {
-    crate::context::use_connected_device_provider();
+    crate::context::use_app_state_provider();
     crate::api::ble_service::use_ble_provider();
     // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
     rsx! {

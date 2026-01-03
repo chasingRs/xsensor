@@ -1,22 +1,23 @@
 use crate::api::ble_service::use_ble;
-use crate::context::use_connected_device;
+use crate::context::use_app_state;
 use dioxus::prelude::*;
 use futures::StreamExt;
 
 const SERVICE_UUID: &str = "0000ffe0-0000-1000-8000-00805f9b34fb";
-const PS_DATA_UUID: &str = "0000ffe6-0000-1000-8000-00805f9b34fb";
-const ACC_DATA_UUID: &str = "0000ffe7-0000-1000-8000-00805f9b34fb";
-const PS_FREQ_UUID: &str = "0000ffe8-0000-1000-8000-00805f9b34fb";
 const PS_INT_UUID: &str = "0000ffe4-0000-1000-8000-00805f9b34fb";
 const ACC_INT_UUID: &str = "0000ffe5-0000-1000-8000-00805f9b34fb";
+const RELOAD_INT_UUID: &str = "0000ffe6-0000-1000-8000-00805f9b34fb";
+const PS_DATA_UUID: &str = "0000ffe7-0000-1000-8000-00805f9b34fb";
+const ACC_DATA_UUID: &str = "0000ffe8-0000-1000-8000-00805f9b34fb";
+const PS_FREQ_UUID: &str = "0000ffe9-0000-1000-8000-00805f9b34fb";
 const BATTERY_SERVICE_UUID: &str = "0000180f-0000-1000-8000-00805f9b34fb";
 const BATTERY_LEVEL_UUID: &str = "00002a19-0000-1000-8000-00805f9b34fb";
 
 #[component]
 pub fn Status() -> Element {
-    let connected_device = use_connected_device();
+    let app_state = use_app_state();
     let ble = use_ble();
-    let device_id = connected_device.id.read().clone();
+    let device_id = app_state.connected_device_id.read().clone();
 
     // 真实数据状态
     let mut battery_level = use_signal(|| 0);
@@ -24,8 +25,10 @@ pub fn Status() -> Element {
     let mut sensor_data_2 = use_signal(|| vec![0.0; 50]); // ACC Data
     let mut trigger_count_1 = use_signal(|| 0); // PS Interrupt
     let mut trigger_count_2 = use_signal(|| 0); // ACC Interrupt
+    let mut trigger_count_3 = use_signal(|| 0); // Reload Interrupt
     let mut trigger_active_1 = use_signal(|| false);
     let mut trigger_active_2 = use_signal(|| false);
+    let mut trigger_active_3 = use_signal(|| false);
     let mut ps_refresh_freq = use_signal(|| 5); // 刷新频率
     let mut acc_refresh_freq = use_signal(|| 5);
     let mut is_loaded = use_signal(|| false);
@@ -74,7 +77,7 @@ pub fn Status() -> Element {
 
     // 读取刷新频率和电池电量
     use_resource(move || {
-        let id = connected_device.id.read().clone();
+        let id = app_state.connected_device_id.read().clone();
         async move {
             if id.is_empty() {
                 return;
@@ -127,7 +130,7 @@ pub fn Status() -> Element {
 
     // Battery Subscription
     use_resource(move || {
-        let id = connected_device.id.read().clone();
+        let id = app_state.connected_device_id.read().clone();
         async move {
             if id.is_empty() {
                 return;
@@ -159,7 +162,7 @@ pub fn Status() -> Element {
 
     // PS Polling
     use_resource(move || {
-        let id = connected_device.id.read().clone();
+        let id = app_state.connected_device_id.read().clone();
         async move {
             if id.is_empty() {
                 return;
@@ -199,7 +202,7 @@ pub fn Status() -> Element {
 
     // ACC Polling
     use_resource(move || {
-        let id = connected_device.id.read().clone();
+        let id = app_state.connected_device_id.read().clone();
         async move {
             if id.is_empty() {
                 return;
@@ -239,7 +242,7 @@ pub fn Status() -> Element {
 
     // PS Interrupt Subscription
     use_resource(move || {
-        let id = connected_device.id.read().clone();
+        let id = app_state.connected_device_id.read().clone();
         async move {
             if id.is_empty() {
                 return;
@@ -255,7 +258,7 @@ pub fn Status() -> Element {
             }
             match ble.subscribe(&id, SERVICE_UUID, PS_INT_UUID).await {
                 Ok(mut stream) => {
-                    while let Some(_) = stream.next().await {
+                    while let Some(data) = stream.next().await {
                         trigger_count_1.with_mut(|c| *c += 1);
                         trigger_active_1.set(true);
                         let mut active = trigger_active_1.clone();
@@ -272,7 +275,7 @@ pub fn Status() -> Element {
 
     // ACC Interrupt Subscription
     use_resource(move || {
-        let id = connected_device.id.read().clone();
+        let id = app_state.connected_device_id.read().clone();
         async move {
             if id.is_empty() {
                 return;
@@ -288,7 +291,7 @@ pub fn Status() -> Element {
             }
             match ble.subscribe(&id, SERVICE_UUID, ACC_INT_UUID).await {
                 Ok(mut stream) => {
-                    while let Some(_) = stream.next().await {
+                    while let Some(data) = stream.next().await {
                         trigger_count_2.with_mut(|c| *c += 1);
                         trigger_active_2.set(true);
                         let mut active = trigger_active_2.clone();
@@ -299,6 +302,39 @@ pub fn Status() -> Element {
                     }
                 }
                 Err(e) => error!("Failed to subscribe ACC int: {}", e),
+            }
+        }
+    });
+
+    // Reload Interrupt Subscription
+    use_resource(move || {
+        let id = app_state.connected_device_id.read().clone();
+        async move {
+            if id.is_empty() {
+                return;
+            }
+            // Wait for services to be discovered
+            loop {
+                if let Ok(services) = ble.list_characteristics(id.clone()).await {
+                    if services.iter().any(|s| s.uuid == SERVICE_UUID) {
+                        break;
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+            match ble.subscribe(&id, SERVICE_UUID, RELOAD_INT_UUID).await {
+                Ok(mut stream) => {
+                    while let Some(_data) = stream.next().await {
+                        trigger_count_3.with_mut(|c| *c += 1);
+                        trigger_active_3.set(true);
+                        let mut active = trigger_active_3.clone();
+                        spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                            active.set(false);
+                        });
+                    }
+                }
+                Err(e) => error!("Failed to subscribe Reload int: {}", e),
             }
         }
     });
@@ -322,14 +358,17 @@ pub fn Status() -> Element {
                     sensor_data_2: sensor_data_2(),
                     trigger_count_1: trigger_count_1(),
                     trigger_count_2: trigger_count_2(),
+                    trigger_count_3: trigger_count_3(),
                     trigger_active_1: trigger_active_1(),
                     trigger_active_2: trigger_active_2(),
+                    trigger_active_3: trigger_active_3(),
                     ps_freq: ps_refresh_freq(),
                     acc_freq: acc_refresh_freq(),
                     on_ps_freq_change,
                     on_acc_freq_change,
                     on_reset_ps: move |_| trigger_count_1.set(0),
                     on_reset_acc: move |_| trigger_count_2.set(0),
+                    on_reset_reload: move |_| trigger_count_3.set(0),
                 }
             }
         }
@@ -355,14 +394,17 @@ fn StatusContent(
     sensor_data_2: Vec<f32>,
     trigger_count_1: i32,
     trigger_count_2: i32,
+    trigger_count_3: i32,
     trigger_active_1: bool,
     trigger_active_2: bool,
+    trigger_active_3: bool,
     ps_freq: i32,
     acc_freq: i32,
     on_ps_freq_change: EventHandler<i32>,
     on_acc_freq_change: EventHandler<i32>,
     on_reset_ps: EventHandler<()>,
     on_reset_acc: EventHandler<()>,
+    on_reset_reload: EventHandler<()>,
 ) -> Element {
     rsx! {
         div { class: "w-full px-4 py-4 space-y-4",
@@ -378,10 +420,13 @@ fn StatusContent(
             TriggerCounters {
                 ps_int_count: trigger_count_1,
                 acc_int_count: trigger_count_2,
+                reload_int_count: trigger_count_3,
                 ps_int_active: trigger_active_1,
                 acc_int_active: trigger_active_2,
+                reload_int_active: trigger_active_3,
                 on_reset_ps,
                 on_reset_acc,
+                on_reset_reload,
             }
         }
     }
@@ -429,21 +474,21 @@ fn SensorCharts(
     rsx! {
         div { class: "grid grid-cols-1 lg:grid-cols-2 gap-4",
             SensorCard {
-                title: "PS 传感器数值",
-                subtitle: "接近传感器实时数据 (UUID: 0xFFE6)",
+                title: "PS 传感器数据".to_string(),
+                subtitle: "接近传感器实时数据 (UUID: 0xFFE6)".to_string(),
                 current_value: ps_data.last().copied().unwrap_or(0.0),
                 data: ps_data,
-                color: "#60cd18",
+                color: "#60cd18".to_string(),
                 freq: ps_freq,
                 max_value: 4096.0,
                 on_freq_change: on_ps_freq_change,
             }
             SensorCard {
-                title: "ACC 传感器数值",
-                subtitle: "加速度传感器实时数据 (UUID: 0xFFE7)",
+                title: "ACC 传感器数据".to_string(),
+                subtitle: "加速度传感器实时数据 (UUID: 0xFFE7)".to_string(),
                 current_value: acc_data.last().copied().unwrap_or(0.0),
                 data: acc_data,
-                color: "#2d6cdf",
+                color: "#2d6cdf".to_string(),
                 freq: acc_freq,
                 max_value: 20.0, // 假设加速度最大值为 20.0
                 on_freq_change: on_acc_freq_change,
@@ -499,10 +544,13 @@ fn SensorCard(
 fn TriggerCounters(
     ps_int_count: i32,
     acc_int_count: i32,
+    reload_int_count: i32,
     ps_int_active: bool,
     acc_int_active: bool,
+    reload_int_active: bool,
     on_reset_ps: EventHandler<()>,
     on_reset_acc: EventHandler<()>,
+    on_reset_reload: EventHandler<()>,
 ) -> Element {
     rsx! {
         div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4",
@@ -510,22 +558,30 @@ fn TriggerCounters(
                 h2 { class: "text-base font-medium", "中断通知计数器" }
                 p { class: "text-[10px] text-gray-500 mt-0.5", "接收来自设备的中断通知" }
             }
-            div { class: "grid grid-cols-1 md:grid-cols-2 gap-4",
+            div { class: "grid grid-cols-1 md:grid-cols-3 gap-4",
                 TriggerCounter {
-                    label: "PS 中断通知",
-                    subtitle: "UUID: 0xFFE4",
+                    label: "PS 中断通知".to_string(),
+                    subtitle: "UUID: 0xFFE4".to_string(),
                     count: ps_int_count,
                     is_active: ps_int_active,
                     color: "emerald",
                     on_reset: on_reset_ps,
                 }
                 TriggerCounter {
-                    label: "ACC 中断通知",
-                    subtitle: "UUID: 0xFFE5",
+                    label: "ACC 中断通知".to_string(),
+                    subtitle: "UUID: 0xFFE5".to_string(),
                     count: acc_int_count,
                     is_active: acc_int_active,
                     color: "blue",
                     on_reset: on_reset_acc,
+                }
+                TriggerCounter {
+                    label: "Reload 中断通知".to_string(),
+                    subtitle: "UUID: 0xFFE6".to_string(),
+                    count: reload_int_count,
+                    is_active: reload_int_active,
+                    color: "orange",
+                    on_reset: on_reset_reload,
                 }
             }
         }
@@ -555,7 +611,7 @@ fn TriggerCounter(
 
     rsx! {
         div { class: "relative",
-            // 波纹效果层 - 使用 pointer-events-none 避免影响布局
+            // 波纹效果 - 使用 pointer-events-none 避免影响布局
             if is_active {
                 div {
                     class: "absolute inset-0 rounded-lg animate-ripple pointer-events-none z-0",
@@ -585,12 +641,10 @@ fn TriggerCounter(
                             }
                         }
                     }
-                    div { class: "text-[10px] text-gray-500 leading-none min-h-3",
-                        "{subtitle}"
-                    }
+                    div { class: "text-[10px] text-gray-500 leading-none min-h-3", "{subtitle}" }
                 }
 
-                // 固定高度的数字容器 - 不再缩放字号，只改颜色/阴影
+                // 固定高度的数字容器 - 不再缩放字号，只改颜色阴影
                 div { class: "h-12 flex items-center overflow-hidden",
                     div {
                         class: format!(
@@ -602,7 +656,7 @@ fn TriggerCounter(
                     }
                 }
 
-                // 底部操作区 - 固定高度
+                // 底部操作栏 - 固定高度
                 div { class: "h-6 flex items-center",
                     button {
                         class: "text-[10px] px-2 py-0.5 rounded bg-[#2a2a2a] hover:bg-[#333] cursor-pointer text-gray-300 transition-colors",
@@ -634,6 +688,12 @@ fn get_trigger_colors(color: &str) -> (&'static str, &'static str, &'static str,
             "border-purple-500",
             "bg-purple-500/20",
             "rgba(168, 85, 247, 0.6)", // purple-500
+        ),
+        "orange" => (
+            "text-orange-400",
+            "border-orange-500",
+            "bg-orange-500/20",
+            "rgba(249, 115, 22, 0.6)", // orange-500
         ),
         _ => (
             "text-gray-400",
