@@ -258,7 +258,7 @@ pub fn Status() -> Element {
             }
             match ble.subscribe(&id, SERVICE_UUID, PS_INT_UUID).await {
                 Ok(mut stream) => {
-                    while let Some(data) = stream.next().await {
+                    while let Some(_data) = stream.next().await {
                         trigger_count_1.with_mut(|c| *c += 1);
                         trigger_active_1.set(true);
                         let mut active = trigger_active_1.clone();
@@ -291,7 +291,7 @@ pub fn Status() -> Element {
             }
             match ble.subscribe(&id, SERVICE_UUID, ACC_INT_UUID).await {
                 Ok(mut stream) => {
-                    while let Some(data) = stream.next().await {
+                    while let Some(_data) = stream.next().await {
                         trigger_count_2.with_mut(|c| *c += 1);
                         trigger_active_2.set(true);
                         let mut active = trigger_active_2.clone();
