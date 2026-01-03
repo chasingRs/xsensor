@@ -9,12 +9,12 @@ permissions:
   contents: write
 
 jobs:
-  bundle-desktop:
+  bundle-linux:
     runs-on: ubuntu-22.04
     env:
       BUNDLE_DIR: target/release/bundle
-      BUNDLE_ARCHIVE: ${{ github.event.repository.name }}-bundle.tar.gz
-      BUNDLE_ARTIFACT_NAME: ${{ github.event.repository.name }}-desktop-bundle
+      BUNDLE_ARCHIVE: ${{ github.event.repository.name }}-linux.tar.gz
+      BUNDLE_ARTIFACT_NAME: ${{ github.event.repository.name }}-linux-bundle
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -57,6 +57,54 @@ jobs:
             echo "Archiving bundle failed. Verify bundle contents and rerun."
             exit 1
           fi
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BUNDLE_ARTIFACT_NAME }}
+          path: ${{ env.BUNDLE_ARCHIVE }}
+
+      - name: Attach bundle to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.BUNDLE_ARCHIVE }}
+
+  bundle-windows:
+    runs-on: windows-latest
+    env:
+      BUNDLE_DIR: target/release/bundle
+      BUNDLE_ARCHIVE: ${{ github.event.repository.name }}-windows.zip
+      BUNDLE_ARTIFACT_NAME: ${{ github.event.repository.name }}-windows-bundle
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Cache cargo registries and binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: dioxus-cli-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Dioxus CLI
+        run: cargo install dioxus-cli --locked --force
+
+      - name: Bundle desktop release
+        run: dx bundle --platform desktop --release
+
+      - name: Package bundles
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path $env:BUNDLE_DIR)) {
+            Write-Error "Bundle failed: directory $env:BUNDLE_DIR not created."
+            exit 1
+          }
+          Compress-Archive -Path "$env:BUNDLE_DIR\*" -DestinationPath $env:BUNDLE_ARCHIVE
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
