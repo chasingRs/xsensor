@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   bundle-linux:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       BUNDLE_DIR: target/dx/xsensor/bundle/linux/bundle
       BUNDLE_ARCHIVE: ${{ github.event.repository.name }}-linux.tar.gz
