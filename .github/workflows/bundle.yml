@@ -12,7 +12,7 @@ jobs:
   bundle-linux:
     runs-on: ubuntu-22.04
     env:
-      BUNDLE_DIR: target/release/bundle
+      BUNDLE_DIR: target/dx/xsensor/bundle/linux/bundle
       BUNDLE_ARCHIVE: ${{ github.event.repository.name }}-linux.tar.gz
       BUNDLE_ARTIFACT_NAME: ${{ github.event.repository.name }}-linux-bundle
     steps:
@@ -36,13 +36,18 @@ jobs:
             librsvg2-dev \
             patchelf \
             libwebkit2gtk-4.0-dev \
-            libssl-dev
+            libssl-dev \
+            libdbus-1-dev \
+            pkg-config
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
       - name: Install Dioxus CLI
-        run: cargo install dioxus-cli --locked --force
+        run: cargo binstall dioxus-cli --force
 
       - name: Bundle desktop release
         run: dx bundle --platform desktop --release
@@ -73,7 +78,7 @@ jobs:
   bundle-windows:
     runs-on: windows-latest
     env:
-      BUNDLE_DIR: target/release/bundle
+      BUNDLE_DIR: target/dx/xsensor/bundle/windows/bundle
       BUNDLE_ARCHIVE: ${{ github.event.repository.name }}-windows.zip
       BUNDLE_ARTIFACT_NAME: ${{ github.event.repository.name }}-windows-bundle
     steps:
@@ -91,8 +96,11 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
       - name: Install Dioxus CLI
-        run: cargo install dioxus-cli --locked --force
+        run: cargo binstall dioxus-cli --force
 
       - name: Bundle desktop release
         run: dx bundle --platform desktop --release
