@@ -87,8 +87,7 @@ jobs:
           fi
           # Package all bundle artifacts (deb, rpm, appimage)
           tar -czvf "$BUNDLE_ARCHIVE" -C "$BUNDLE_DIR" .
-          echo "Archive contents:"
-          tar -tzvf "$BUNDLE_ARCHIVE" | head -20
+          echo "Archive created: $(ls -lh "$BUNDLE_ARCHIVE")"
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
