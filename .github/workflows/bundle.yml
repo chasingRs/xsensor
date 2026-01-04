@@ -61,7 +61,7 @@ jobs:
 
           # Generate a square 512x512 PNG for AppImage and verify it exists.
           mkdir -p icons
-          magick icons/icon.ico -resize 512x512 icons/icon.png
+          convert icons/icon.ico -resize 512x512 icons/icon.png
           test -f icons/icon.png
 
           # Make icon paths absolute to avoid cwd-dependent failures during bundling.
