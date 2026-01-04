@@ -60,8 +60,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends imagemagick
 
           # Generate a square 512x512 PNG for AppImage and verify it exists.
+          # ICO files contain multiple images; extract the first one [0] and resize.
           mkdir -p icons
-          convert icons/icon.ico -resize 512x512 icons/icon.png
+          convert 'icons/icon.ico[0]' -resize 512x512 icons/icon.png
+          ls -la icons/
           test -f icons/icon.png
 
           # Make icon paths absolute to avoid cwd-dependent failures during bundling.
