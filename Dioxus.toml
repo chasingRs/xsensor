@@ -24,4 +24,4 @@ script = []
 [bundle]
 identifier = "com.pkjifinity.com"
 publisher = "pkjinfinity"
-icon = ["assets/favicon.ico"]
+icon = ["icons/icon.ico"]
