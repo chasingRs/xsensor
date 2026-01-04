@@ -79,14 +79,16 @@ jobs:
 
       - name: Package bundles
         run: |
+          echo "Checking BUNDLE_DIR: $BUNDLE_DIR"
+          ls -laR "$BUNDLE_DIR" || true
           if [ ! -d "$BUNDLE_DIR" ]; then
             echo "Bundle failed: directory $BUNDLE_DIR not created. Check the 'Bundle desktop release' step logs."
             exit 1
           fi
-          if ! tar -czf "$BUNDLE_ARCHIVE" -C "$BUNDLE_DIR" --exclude='.*' .; then
-            echo "Archiving bundle failed. Verify bundle contents and rerun."
-            exit 1
-          fi
+          # Package all bundle artifacts (deb, rpm, appimage)
+          tar -czvf "$BUNDLE_ARCHIVE" -C "$BUNDLE_DIR" .
+          echo "Archive contents:"
+          tar -tzvf "$BUNDLE_ARCHIVE" | head -20
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
