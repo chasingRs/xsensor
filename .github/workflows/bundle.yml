@@ -35,7 +35,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
             libssl-dev \
             libdbus-1-dev \
             pkg-config
