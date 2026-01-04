@@ -37,6 +37,7 @@ jobs:
             patchelf \
             libwebkit2gtk-4.1-dev \
             libssl-dev \
+            libxdo-dev \
             libdbus-1-dev \
             pkg-config
 
