@@ -1,10 +1,10 @@
 [application]
+name = "Xsensor"
 
 [web.app]
 
 # HTML title tag content
 title = "xsensor"
-name = "xsensor"
 
 # include `assets` in web platform
 [web.resource]
@@ -22,6 +22,6 @@ script = []
 script = []
 
 [bundle]
-identifier = "com.pkjifinity.com"
+identifier = "com.pkjinfinity.xsensor"
 publisher = "pkjinfinity"
 icon = ["icons/icon.ico"]
