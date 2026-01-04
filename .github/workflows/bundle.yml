@@ -54,12 +54,25 @@ jobs:
         run: cargo binstall dioxus-cli --force
 
       - name: Generate Linux Icon
+        working-directory: ${{ github.workspace }}
         run: |
-          sudo apt-get install -y imagemagick
-          convert icons/icon.ico -thumbnail 512x512 icons/icon.png
-          sed -i 's|icon = \["icons/icon.ico"\]|icon = ["icons/icon.ico", "icons/icon.png"]|' Dioxus.toml
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick
+
+          # Generate a square 512x512 PNG for AppImage and verify it exists.
+          mkdir -p icons
+          magick icons/icon.ico -resize 512x512 icons/icon.png
+          test -f icons/icon.png
+
+          # Make icon paths absolute to avoid cwd-dependent failures during bundling.
+          ICO_PATH="$(realpath icons/icon.ico)"
+          PNG_PATH="$(realpath icons/icon.png)"
+          sed -i "s|^icon = .*|icon = [\"${ICO_PATH}\", \"${PNG_PATH}\"]|" Dioxus.toml
+
+          echo "Using icons:"; ls -la icons
 
       - name: Bundle desktop release
+        working-directory: ${{ github.workspace }}
         run: dx bundle --platform desktop --release
 
       - name: Package bundles
