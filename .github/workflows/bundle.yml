@@ -53,6 +53,12 @@ jobs:
       - name: Install Dioxus CLI
         run: cargo binstall dioxus-cli --force
 
+      - name: Generate Linux Icon
+        run: |
+          sudo apt-get install -y imagemagick
+          convert icons/icon.ico -thumbnail 512x512 icons/icon.png
+          sed -i 's|icon = \["icons/icon.ico"\]|icon = ["icons/icon.ico", "icons/icon.png"]|' Dioxus.toml
+
       - name: Bundle desktop release
         run: dx bundle --platform desktop --release
 
