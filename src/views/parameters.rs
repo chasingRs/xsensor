@@ -77,16 +77,29 @@ pub fn Parameters() -> Element {
         });
     });
 
+    let theme = (app_state.theme)();
     rsx! {
-        div { class: "h-full w-full text-gray-100 overflow-auto relative",
+        div {
+            class: theme
+                .pick(
+                    "h-full w-full text-gray-100 overflow-auto relative",
+                    "h-full w-full text-gray-900 overflow-auto relative",
+                ),
             if device_id.is_empty() {
                 ParametersEmptyState {}
             } else {
                 if !is_loaded() {
-                    div { class: "absolute inset-0 z-50 flex items-center justify-center bg-[#1b1b1b]/80 backdrop-blur-sm",
+                    div {
+                        class: theme
+                            .pick(
+                                "absolute inset-0 z-50 flex items-center justify-center bg-[#1b1b1b]/80 backdrop-blur-sm",
+                                "absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm",
+                            ),
                         div { class: "flex flex-col items-center gap-3",
                             span { class: "animate-spin inline-block w-8 h-8 border-4 border-[#60cd18] border-t-transparent rounded-full" }
-                            span { class: "text-sm text-gray-300 font-medium", "正在读取参数..." }
+                            span { class: theme.pick("text-sm text-gray-300 font-medium", "text-sm text-gray-600 font-medium"),
+                                "正在读取参数..."
+                            }
                         }
                     }
                 }
@@ -223,6 +236,17 @@ fn ParametersHeader(
     on_save: EventHandler<()>,
     on_reset: EventHandler<()>,
 ) -> Element {
+    let app_state = use_app_state();
+    let theme = (app_state.theme)();
+    let reset_btn_class = theme.pick(
+        "inline-flex items-center gap-2 rounded-lg bg-[#2a2a2a] hover:bg-[#333] cursor-pointer px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors",
+        "inline-flex items-center gap-2 rounded-lg bg-gray-100 hover:bg-gray-200 cursor-pointer px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors",
+    );
+    let save_active_class = "inline-flex items-center gap-2 rounded-lg bg-[#60cd18] hover:bg-[#6fe12a] cursor-pointer px-3 py-1.5 text-xs font-medium text-gray-900 transition-colors";
+    let save_inactive_class = theme.pick(
+        "inline-flex items-center gap-2 rounded-lg bg-[#2a2a2a] px-3 py-1.5 text-xs font-medium text-gray-500 cursor-not-allowed",
+        "inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-400 cursor-not-allowed",
+    );
     rsx! {
         div { class: "flex flex-col md:flex-row md:items-center md:justify-between gap-2",
             div {
@@ -233,12 +257,12 @@ fn ParametersHeader(
             }
             div { class: "flex gap-2",
                 button {
-                    class: "inline-flex items-center gap-2 rounded-lg bg-[#2a2a2a] hover:bg-[#333] cursor-pointer px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors",
+                    class: "{reset_btn_class}",
                     onclick: move |_| on_reset.call(()),
                     "重置"
                 }
                 button {
-                    class: if has_changes { "inline-flex items-center gap-2 rounded-lg bg-[#60cd18] hover:bg-[#6fe12a] cursor-pointer px-3 py-1.5 text-xs font-medium text-gray-900 transition-colors" } else { "inline-flex items-center gap-2 rounded-lg bg-[#2a2a2a] px-3 py-1.5 text-xs font-medium text-gray-500 cursor-not-allowed" },
+                    class: if has_changes { save_active_class } else { save_inactive_class },
                     disabled: !has_changes,
                     onclick: move |_| on_save.call(()),
                     "保存"
@@ -257,9 +281,16 @@ fn ThresholdPairCard(
 ) -> Element {
     let percentage_low = (low_value as f64 / 2047.0 * 100.0) as i32;
     let percentage_high = (high_value as f64 / 2047.0 * 100.0) as i32;
+    let app_state = use_app_state();
+    let theme = (app_state.theme)();
 
     rsx! {
-        div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4 space-y-4",
+        div {
+            class: theme
+                .pick(
+                    "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4 space-y-4",
+                    "rounded-xl border border-gray-200 bg-white p-4 space-y-4 shadow-sm",
+                ),
             div {
                 h2 { class: "text-base font-medium mb-1", "PS 传感器阈值对" }
                 p { class: "text-xs text-gray-400",
@@ -298,9 +329,16 @@ fn ThresholdPairCard(
 #[component]
 fn AccelThresholdCard(value: i32, on_change: EventHandler<i32>) -> Element {
     let percentage = (value as f64 / 40.0 * 100.0) as i32;
+    let app_state = use_app_state();
+    let theme = (app_state.theme)();
 
     rsx! {
-        div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4 space-y-4",
+        div {
+            class: theme
+                .pick(
+                    "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4 space-y-4",
+                    "rounded-xl border border-gray-200 bg-white p-4 space-y-4 shadow-sm",
+                ),
             div {
                 h2 { class: "text-base font-medium mb-1", "ACC 传感器阈值" }
                 p { class: "text-xs text-gray-400",
@@ -331,18 +369,28 @@ fn ThresholdSlider(
     on_change: EventHandler<i32>,
 ) -> Element {
     let (slider_color, text_color) = get_slider_colors(color);
+    let app_state = use_app_state();
+    let theme = (app_state.theme)();
+    let input_class = if theme.is_dark() {
+        format!("w-20 px-2 py-1 text-sm font-semibold {} bg-[#2a2a2a] border border-[#3a3a3a] rounded text-right focus:outline-none focus:border-[#60cd18]", text_color)
+    } else {
+        format!("w-20 px-2 py-1 text-sm font-semibold {} bg-gray-50 border border-gray-300 rounded text-right focus:outline-none focus:border-[#60cd18]", text_color)
+    };
+    let label_class = theme.pick("text-sm font-medium text-gray-300", "text-sm font-medium text-gray-700");
+    let max_class   = theme.pick("text-sm text-gray-500", "text-sm text-gray-400");
+    let pct_class   = theme.pick("text-sm text-gray-400 min-w-12 text-right", "text-sm text-gray-500 min-w-12 text-right");
 
     rsx! {
         div { class: "space-y-3",
             div { class: "flex items-center justify-between",
-                label { class: "text-sm font-medium text-gray-300", "{label}" }
+                label { class: "{label_class}", "{label}" }
                 div { class: "flex items-center gap-2",
                     input {
                         r#type: "number",
                         min: "0",
                         max: "{max_value}",
                         value: "{value}",
-                        class: "w-20 px-2 py-1 text-sm font-semibold {text_color} bg-[#2a2a2a] border border-[#3a3a3a] rounded text-right focus:outline-none focus:border-[#60cd18]",
+                        class: "{input_class}",
                         oninput: move |evt| {
                             if let Ok(val) = evt.value().parse::<i32>() {
                                 if val >= 0 && val <= max_value {
@@ -351,7 +399,7 @@ fn ThresholdSlider(
                             }
                         },
                     }
-                    span { class: "text-sm text-gray-500", "/ {max_value}" }
+                    span { class: "{max_class}", "/ {max_value}" }
                 }
             }
 
@@ -368,7 +416,7 @@ fn ThresholdSlider(
                         }
                     },
                 }
-                span { class: "text-sm text-gray-400 min-w-12 text-right", "{percentage}%" }
+                span { class: "{pct_class}", "{percentage}%" }
             }
         }
     }

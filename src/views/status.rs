@@ -19,7 +19,6 @@ pub fn Status() -> Element {
     let ble = use_ble();
     let device_id = app_state.connected_device_id.read().clone();
 
-    // 真实数据状态
     let mut battery_level = use_signal(|| 0);
     let mut sensor_data_1 = use_signal(|| vec![0.0; 50]); // PS Data
     let mut sensor_data_2 = use_signal(|| vec![0.0; 50]); // ACC Data
@@ -339,16 +338,29 @@ pub fn Status() -> Element {
         }
     });
 
+    let theme = (app_state.theme)();
     rsx! {
-        div { class: "h-full w-full text-gray-100 overflow-auto relative",
+        div {
+            class: theme
+                .pick(
+                    "h-full w-full text-gray-100 overflow-auto relative",
+                    "h-full w-full text-gray-900 overflow-auto relative",
+                ),
             if device_id.is_empty() {
                 StatusEmptyState {}
             } else {
                 if !is_loaded() {
-                    div { class: "absolute inset-0 z-50 flex items-center justify-center bg-[#1b1b1b]/80 backdrop-blur-sm",
+                    div {
+                        class: theme
+                            .pick(
+                                "absolute inset-0 z-50 flex items-center justify-center bg-[#1b1b1b]/80 backdrop-blur-sm",
+                                "absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm",
+                            ),
                         div { class: "flex flex-col items-center gap-3",
                             span { class: "animate-spin inline-block w-8 h-8 border-4 border-[#60cd18] border-t-transparent rounded-full" }
-                            span { class: "text-sm text-gray-300 font-medium", "正在发现服务..." }
+                            span { class: theme.pick("text-sm text-gray-300 font-medium", "text-sm text-gray-600 font-medium"),
+                                "正在发现服务..."
+                            }
                         }
                     }
                 }
@@ -446,8 +458,15 @@ fn StatusHeader(battery_level: i32) -> Element {
 
 #[component]
 fn BatteryIndicator(level: i32, color: &'static str, bg: &'static str) -> Element {
+    let app_state = use_app_state();
+    let theme = (app_state.theme)();
     rsx! {
-        div { class: "flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#2a2a2a] bg-[#1f1f1f]",
+        div {
+            class: theme
+                .pick(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#2a2a2a] bg-[#1f1f1f]",
+                    "flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white shadow-sm",
+                ),
             div { class: "flex items-center gap-2",
                 div { class: "relative w-8 h-4 border border-gray-400 rounded",
                     div {
@@ -513,16 +532,32 @@ fn SensorCard(
     } else {
         "text-[#2d6cdf]"
     };
+    let app_state = use_app_state();
+    let theme = (app_state.theme)();
 
     rsx! {
-        div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4 space-y-2",
+        div {
+            class: theme
+                .pick(
+                    "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4 space-y-2",
+                    "rounded-xl border border-gray-200 bg-white p-4 space-y-2 shadow-sm",
+                ),
             div {
                 div { class: "flex items-center justify-between mb-1",
                     h2 { class: "text-base font-medium", "{title}" }
-                    div { class: "flex items-center gap-2 text-xs text-gray-400",
+                    div {
+                        class: theme
+                            .pick(
+                                "flex items-center gap-2 text-xs text-gray-400",
+                                "flex items-center gap-2 text-xs text-gray-500",
+                            ),
                         span { "Freq:" }
                         input {
-                            class: "w-10 bg-[#2a2a2a] border border-gray-600 rounded px-1 text-center text-white focus:outline-none focus:border-blue-500",
+                            class: theme
+                                .pick(
+                                    "w-10 bg-[#2a2a2a] border border-gray-600 rounded px-1 text-center text-white focus:outline-none focus:border-blue-500",
+                                    "w-10 bg-gray-100 border border-gray-300 rounded px-1 text-center text-gray-900 focus:outline-none focus:border-blue-500",
+                                ),
                             r#type: "number",
                             min: "0",
                             max: "7",
@@ -552,11 +587,20 @@ fn TriggerCounters(
     on_reset_acc: EventHandler<()>,
     on_reset_reload: EventHandler<()>,
 ) -> Element {
+    let app_state = use_app_state();
+    let theme = (app_state.theme)();
     rsx! {
-        div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4",
+        div {
+            class: theme
+                .pick(
+                    "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-4",
+                    "rounded-xl border border-gray-200 bg-white p-4 shadow-sm",
+                ),
             div { class: "mb-3",
                 h2 { class: "text-base font-medium", "中断通知计数器" }
-                p { class: "text-[10px] text-gray-500 mt-0.5", "接收来自设备的中断通知" }
+                p { class: theme.pick("text-[10px] text-gray-500 mt-0.5", "text-[10px] text-gray-400 mt-0.5"),
+                    "接收来自设备的中断通知"
+                }
             }
             div { class: "grid grid-cols-1 md:grid-cols-3 gap-4",
                 TriggerCounter {
@@ -598,6 +642,12 @@ fn TriggerCounter(
     on_reset: EventHandler<()>,
 ) -> Element {
     let (text_color, border_color, bg_color, ripple_color) = get_trigger_colors(color);
+    let app_state = use_app_state();
+    let theme = (app_state.theme)();
+    let inactive_card = theme.pick(
+        "rounded-lg border border-[#2a2a2a] bg-[#191919] p-3 space-y-1 transition-all duration-150",
+        "rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-1 transition-all duration-150",
+    );
 
     let card_class = if is_active {
         format!(
@@ -605,8 +655,7 @@ fn TriggerCounter(
             border_color, bg_color
         )
     } else {
-        "rounded-lg border border-[#2a2a2a] bg-[#191919] p-3 space-y-1 transition-all duration-150"
-            .to_string()
+        inactive_card.to_string()
     };
 
     rsx! {
@@ -659,7 +708,11 @@ fn TriggerCounter(
                 // 底部操作栏 - 固定高度
                 div { class: "h-6 flex items-center",
                     button {
-                        class: "text-[10px] px-2 py-0.5 rounded bg-[#2a2a2a] hover:bg-[#333] cursor-pointer text-gray-300 transition-colors",
+                        class: theme
+                            .pick(
+                                "text-[10px] px-2 py-0.5 rounded bg-[#2a2a2a] hover:bg-[#333] cursor-pointer text-gray-300 transition-colors",
+                                "text-[10px] px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 cursor-pointer text-gray-600 transition-colors",
+                            ),
                         onclick: move |_| on_reset.call(()),
                         "重置"
                     }
@@ -707,9 +760,16 @@ fn get_trigger_colors(color: &str) -> (&'static str, &'static str, &'static str,
 #[component]
 fn ChartView(data: Vec<f32>, color: String, max_value: f64) -> Element {
     let path_data = generate_chart_path(&data, max_value);
+    let app_state = use_app_state();
+    let theme = (app_state.theme)();
 
     rsx! {
-        div { class: "w-full h-32 bg-[#161616] rounded-lg p-3 border border-[#2a2a2a]",
+        div {
+            class: theme
+                .pick(
+                    "w-full h-32 bg-[#161616] rounded-lg p-3 border border-[#2a2a2a]",
+                    "w-full h-32 bg-gray-50 rounded-lg p-3 border border-gray-200",
+                ),
             svg {
                 class: "w-full h-full",
                 view_box: "0 0 100 150",

@@ -1,10 +1,12 @@
 // The dioxus prelude contains a ton of common items used in dioxus apps. It's a good idea to import wherever you
 // need dioxus
 use dioxus::prelude::*;
+use dioxus::desktop::{Config, WindowBuilder};
 
 use views::{Connection, Navbar, Parameters, Status};
 
 mod api;
+pub mod ble_constants;
 /// Define a components module that contains all shared components for our app.
 mod components;
 mod context;
@@ -41,7 +43,17 @@ const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 fn main() {
     // The `launch` function is the main entry point for a dioxus app. It takes a component and renders it with the platform feature
     // you have enabled
-    dioxus::launch(App);
+    dioxus::LaunchBuilder::new()
+        .with_cfg(
+            Config::new().with_window(
+                WindowBuilder::new()
+                    .with_title("XSensor")
+                    .with_decorations(false)
+                    .with_inner_size(dioxus::desktop::LogicalSize::new(900.0, 640.0))
+                    .with_min_inner_size(dioxus::desktop::LogicalSize::new(640.0, 400.0)),
+            ),
+        )
+        .launch(App);
 }
 
 /// App is the main component of our app. Components are the building blocks of dioxus apps. Each component is a function

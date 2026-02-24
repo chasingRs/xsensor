@@ -9,3 +9,6 @@ pub use parameters::Parameters;
 
 mod navbar;
 pub use navbar::Navbar;
+
+mod titlebar;
+pub use titlebar::TitleBar;

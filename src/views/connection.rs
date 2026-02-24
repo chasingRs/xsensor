@@ -119,8 +119,15 @@ pub fn Connection() -> Element {
             }
         }
     });
+    let theme = app_state.theme.read().clone();
+    let root_text = theme.pick("text-gray-100", "text-gray-800");
+    let empty_devices_class = theme.pick(
+        "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-6 text-gray-400 text-sm",
+        "rounded-xl border border-[#e0e0e0] bg-white p-6 text-gray-500 text-sm",
+    );
+
     rsx! {
-        div { class: "h-full w-full text-gray-100",
+        div { class: "h-full w-full {root_text}",
             div { class: "w-full px-4 py-4 space-y-4",
                 if !adapter_available() {
                     div { class: "rounded-xl border border-red-500/50 bg-red-500/10 p-3 flex items-center gap-3 text-red-400 text-sm",
@@ -150,9 +157,7 @@ pub fn Connection() -> Element {
                     let devices = app_state.scanned_devices.read();
                     rsx! {
                         if devices.is_empty() {
-                            div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] p-6 text-gray-400 text-sm",
-                                "未发现设备，尝试重新扫描。"
-                            }
+                            div { class: "{empty_devices_class}", "未发现设备，尝试重新扫描。" }
                         } else {
                             DeviceList {
                                 devices: devices.clone(),
@@ -255,8 +260,13 @@ fn DeviceList(
     on_disconnect: EventHandler<String>,
     on_toggle: EventHandler<String>,
 ) -> Element {
+    let theme = crate::context::use_app_state().theme.read().clone();
+    let container_class = theme.pick(
+        "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] divide-y divide-[#2a2a2a] shadow-lg shadow-black/20",
+        "rounded-xl border border-[#e0e0e0] bg-white divide-y divide-[#e0e0e0] shadow-sm",
+    );
     rsx! {
-        div { class: "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] divide-y divide-[#2a2a2a] shadow-lg shadow-black/20",
+        div { class: "{container_class}",
             for dev in devices {
                 DeviceEntry {
                     device: dev.clone(),
@@ -284,6 +294,20 @@ fn DeviceEntry(
     on_disconnect: EventHandler<String>,
     on_toggle: EventHandler<String>,
 ) -> Element {
+    let theme = crate::context::use_app_state().theme.read().clone();
+    let avatar_class = theme.pick(
+        "h-8 w-8 rounded-lg bg-[#242424] flex items-center justify-center text-gray-200 text-xs font-semibold",
+        "h-8 w-8 rounded-lg bg-[#e8e8e8] flex items-center justify-center text-gray-700 text-xs font-semibold",
+    );
+    let device_name_class = theme.pick("text-sm font-medium text-gray-100", "text-sm font-medium text-gray-800");
+    let device_id_class   = theme.pick("text-[10px] text-gray-500",         "text-[10px] text-gray-400");
+    let signal_class      = theme.pick("text-xs text-gray-300",             "text-xs text-gray-600");
+    let expanded_panel_class = theme.pick(
+        "mt-1 mb-2 rounded-lg border border-[#2a2a2a] bg-[#191919] px-3 py-2",
+        "mt-1 mb-2 rounded-lg border border-[#e0e0e0] bg-[#f5f5f5] px-3 py-2",
+    );
+    let service_empty_class = theme.pick("text-xs text-gray-400", "text-xs text-gray-500");
+
     let dev_id = device.id.clone();
     let dev_id_for_toggle = dev_id.clone();
     let dev_id_for_disconnect = dev_id.clone();
@@ -292,15 +316,15 @@ fn DeviceEntry(
         .map(|v| format!("{v} dBm"))
         .unwrap_or_else(|| "未知".to_string());
     let (status_label, status_class) = if is_connected {
-        (
-            "已连接",
-            "bg-emerald-500/15 text-emerald-200 border border-emerald-500/30",
-        )
+        if theme.is_dark() {
+            ("已连接", "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30")
+        } else {
+            ("已连接", "bg-emerald-100 text-emerald-700 border border-emerald-300")
+        }
+    } else if theme.is_dark() {
+        ("未连接", "bg-slate-500/15 text-slate-300 border border-slate-500/30")
     } else {
-        (
-            "未连接",
-            "bg-slate-500/15 text-slate-200 border border-slate-500/30",
-        )
+        ("未连接", "bg-slate-100 text-slate-600 border border-slate-300")
     };
 
     rsx! {
@@ -308,16 +332,14 @@ fn DeviceEntry(
             key: "{device.id}",
             class: "flex flex-col gap-2 md:flex-row md:items-center md:justify-between px-3 py-3",
             div { class: "flex items-center gap-3",
-                div { class: "h-8 w-8 rounded-lg bg-[#242424] flex items-center justify-center text-gray-200 text-xs font-semibold",
-                    "BT"
-                }
+                div { class: "{avatar_class}", "BT" }
                 div {
-                    div { class: "text-sm font-medium", "{device.name}" }
-                    div { class: "text-[10px] text-gray-500", "ID: {device.id}" }
+                    div { class: "{device_name_class}", "{device.name}" }
+                    div { class: "{device_id_class}", "ID: {device.id}" }
                 }
             }
             div { class: "flex flex-col sm:flex-row sm:items-center gap-2 md:gap-3",
-                span { class: "text-xs text-gray-200", "信号: {rssi_text}" }
+                span { class: "{signal_class}", "信号: {rssi_text}" }
                 span { class: format!("text-[10px] px-2 py-0.5 rounded-full {status_class}"),
                     "{status_label}"
                 }
@@ -358,16 +380,16 @@ fn DeviceEntry(
         }
 
         if is_expanded {
-            div { class: "mt-1 mb-2 rounded-lg border border-[#2a2a2a] bg-[#191919] px-3 py-2",
+            div { class: "{expanded_panel_class}",
                 match services {
                     Some(svcs) if !svcs.is_empty() => rsx! {
                         ServiceList { services: svcs }
                     },
                     Some(_) => rsx! {
-                        div { class: "text-xs text-gray-400", "未发现服务" }
+                        div { class: "{service_empty_class}", "未发现服务" }
                     },
                     None => rsx! {
-                        div { class: "text-xs text-gray-400", "正在加载服务..." }
+                        div { class: "{service_empty_class}", "正在加载服务..." }
                     },
                 }
             }
@@ -377,12 +399,21 @@ fn DeviceEntry(
 
 #[component]
 fn ServiceList(services: Vec<UiService>) -> Element {
+    let theme = crate::context::use_app_state().theme.read().clone();
+    let svc_card_class      = theme.pick("rounded-md border border-[#2f2f2f] bg-[#161616]",   "rounded-md border border-[#e0e0e0] bg-[#f8f8f8]");
+    let svc_name_class      = theme.pick("text-sm font-medium",                                "text-sm font-medium text-gray-800");
+    let svc_uuid_class      = theme.pick("text-xs text-gray-500",                              "text-xs text-gray-400");
+    let svc_meta_class      = theme.pick("flex items-center gap-2 text-xs text-gray-400",      "flex items-center gap-2 text-xs text-gray-500");
+    let expand_btn_class    = theme.pick("text-[11px] px-2 py-1 rounded bg-[#222] border border-[#2f2f2f]", "text-[11px] px-2 py-1 rounded bg-[#ebebeb] border border-[#ddd] text-gray-600");
+    let char_section_class  = theme.pick("border-t border-[#2f2f2f] bg-[#121212]",            "border-t border-[#e0e0e0] bg-[#f0f0f0]");
+    let no_char_class       = theme.pick("border-t border-[#2f2f2f] bg-[#121212] px-3 py-2 text-xs text-gray-500", "border-t border-[#e0e0e0] bg-[#f0f0f0] px-3 py-2 text-xs text-gray-400");
+
     let expanded = use_signal(HashSet::<String>::new);
 
     rsx! {
         div { class: "space-y-3",
             for svc in services {
-                div { class: "rounded-md border border-[#2f2f2f] bg-[#161616]",
+                div { class: "{svc_card_class}",
                     div {
                         class: "flex items-center justify-between px-3 py-2 cursor-pointer select-none",
                         onclick: {
@@ -398,12 +429,12 @@ fn ServiceList(services: Vec<UiService>) -> Element {
                             }
                         },
                         div {
-                            div { class: "text-sm font-medium", "{svc.name}" }
-                            div { class: "text-xs text-gray-500", "{svc.uuid}" }
+                            div { class: "{svc_name_class}", "{svc.name}" }
+                            div { class: "{svc_uuid_class}", "{svc.uuid}" }
                         }
-                        div { class: "flex items-center gap-2 text-xs text-gray-400",
+                        div { class: "{svc_meta_class}",
                             span { "特征: {svc.characteristic.len()}" }
-                            span { class: "text-[11px] px-2 py-1 rounded bg-[#222] border border-[#2f2f2f]",
+                            span { class: "{expand_btn_class}",
                                 if expanded.read().contains(&svc.uuid) {
                                     "收起"
                                 } else {
@@ -414,13 +445,11 @@ fn ServiceList(services: Vec<UiService>) -> Element {
                     }
                     if expanded.read().contains(&svc.uuid) {
                         if !svc.characteristic.is_empty() {
-                            div { class: "border-t border-[#2f2f2f] bg-[#121212]",
+                            div { class: "{char_section_class}",
                                 CharacteristicList { chars: svc.characteristic.clone() }
                             }
                         } else {
-                            div { class: "border-t border-[#2f2f2f] bg-[#121212] px-3 py-2 text-xs text-gray-500",
-                                "无特征"
-                            }
+                            div { class: "{no_char_class}", "无特征" }
                         }
                     }
                 }
@@ -431,8 +460,14 @@ fn ServiceList(services: Vec<UiService>) -> Element {
 
 #[component]
 fn CharacteristicList(chars: Vec<UiCharacteristic>) -> Element {
+    let theme = crate::context::use_app_state().theme.read().clone();
+    let table_class    = theme.pick("w-full text-sm text-gray-200",              "w-full text-sm text-gray-700");
+    let row_class      = theme.pick("border-t border-[#1f1f1f] hover:bg-[#181818]", "border-t border-[#eeeeee] hover:bg-[#f0f0f0]");
+    let uuid_td_class  = theme.pick("px-3 py-2 text-xs text-gray-300 break-all", "px-3 py-2 text-xs text-gray-600 break-all");
+    let prop_td_class  = theme.pick("px-3 py-2 text-xs text-gray-400",           "px-3 py-2 text-xs text-gray-500");
+
     rsx! {
-        table { class: "w-full text-sm text-gray-200",
+        table { class: "{table_class}",
             thead { class: "text-xs uppercase text-gray-500",
                 tr {
                     th { class: "px-3 py-2 text-left", "特征 UUID" }
@@ -441,9 +476,9 @@ fn CharacteristicList(chars: Vec<UiCharacteristic>) -> Element {
             }
             tbody {
                 for ch in chars {
-                    tr { class: "border-t border-[#1f1f1f] hover:bg-[#181818]",
-                        td { class: "px-3 py-2 text-xs text-gray-300 break-all", "{ch.uuid}" }
-                        td { class: "px-3 py-2 text-xs text-gray-400",
+                    tr { class: "{row_class}",
+                        td { class: "{uuid_td_class}", "{ch.uuid}" }
+                        td { class: "{prop_td_class}",
                             if ch.property.is_empty() {
                                 span { "—" }
                             } else {
