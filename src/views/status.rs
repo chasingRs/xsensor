@@ -32,6 +32,25 @@ pub fn Status() -> Element {
     let mut acc_refresh_freq = use_signal(|| 5);
     let mut is_loaded = use_signal(|| false);
 
+    // 取消标志：组件卸载时设为 true，让所有后台订阅任务退出
+    // use_resource 创建的任务并不随组件卸载而自动取消，
+    // 使用 use_hook 存储 DropGuard，在 scope drop 时触发清理
+    let cancelled = use_signal(|| false);
+    use_hook(|| {
+        // Clone 返回 active=false 副本，这样 use_hook 返回的克隆被丢弃时不会迎早触发取消。
+        // 只有 use_hook 中存储的原始实例（active=true）在 scope 释放时才进行清理。
+        struct DropGuard { sig: Signal<bool>, active: bool }
+        impl Clone for DropGuard {
+            fn clone(&self) -> Self { DropGuard { sig: self.sig, active: false } }
+        }
+        impl Drop for DropGuard {
+            fn drop(&mut self) {
+                if self.active { self.sig.set(true); }
+            }
+        }
+        DropGuard { sig: cancelled, active: true }
+    });
+
     let device_id_ps_write = device_id.clone();
     let write_ps_freq_task = use_coroutine(move |mut rx: UnboundedReceiver<i32>| {
         let id = device_id_ps_write.clone();
@@ -149,6 +168,7 @@ pub fn Status() -> Element {
             {
                 Ok(mut stream) => {
                     while let Some(data) = stream.next().await {
+                        if cancelled() { break; }
                         if !data.value.is_empty() {
                             battery_level.set(data.value[0] as i32);
                         }
@@ -176,6 +196,7 @@ pub fn Status() -> Element {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
             loop {
+                if cancelled() { break; }
                 let freq = ps_refresh_freq();
                 if freq > 0 {
                     match ble.read(&id, SERVICE_UUID, PS_DATA_UUID).await {
@@ -216,6 +237,7 @@ pub fn Status() -> Element {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
             loop {
+                if cancelled() { break; }
                 let freq = acc_refresh_freq();
                 if freq > 0 {
                     match ble.read(&id, SERVICE_UUID, ACC_DATA_UUID).await {
@@ -258,6 +280,7 @@ pub fn Status() -> Element {
             match ble.subscribe(&id, SERVICE_UUID, PS_INT_UUID).await {
                 Ok(mut stream) => {
                     while let Some(_data) = stream.next().await {
+                        if cancelled() { break; }
                         trigger_count_1.with_mut(|c| *c += 1);
                         trigger_active_1.set(true);
                         let mut active = trigger_active_1.clone();
@@ -291,6 +314,7 @@ pub fn Status() -> Element {
             match ble.subscribe(&id, SERVICE_UUID, ACC_INT_UUID).await {
                 Ok(mut stream) => {
                     while let Some(_data) = stream.next().await {
+                        if cancelled() { break; }
                         trigger_count_2.with_mut(|c| *c += 1);
                         trigger_active_2.set(true);
                         let mut active = trigger_active_2.clone();
@@ -324,6 +348,7 @@ pub fn Status() -> Element {
             match ble.subscribe(&id, SERVICE_UUID, RELOAD_INT_UUID).await {
                 Ok(mut stream) => {
                     while let Some(_data) = stream.next().await {
+                        if cancelled() { break; }
                         trigger_count_3.with_mut(|c| *c += 1);
                         trigger_active_3.set(true);
                         let mut active = trigger_active_3.clone();
