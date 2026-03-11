@@ -262,8 +262,8 @@ fn DeviceList(
 ) -> Element {
     let theme = crate::context::use_app_state().theme.read().clone();
     let container_class = theme.pick(
-        "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] divide-y divide-[#2a2a2a] shadow-lg shadow-black/20",
-        "rounded-xl border border-[#e0e0e0] bg-white divide-y divide-[#e0e0e0] shadow-sm",
+        "rounded-xl border border-[#2a2a2a] bg-[#1f1f1f] divide-y divide-[#2a2a2a] shadow-lg shadow-black/20 overflow-y-auto max-h-[70vh] device-list-scroll device-list-scroll-dark",
+        "rounded-xl border border-[#e0e0e0] bg-white divide-y divide-[#e0e0e0] shadow-sm overflow-y-auto max-h-[70vh] device-list-scroll device-list-scroll-light",
     );
     rsx! {
         div { class: "{container_class}",

@@ -12,6 +12,54 @@ body {
     outline: 0;
 }
 
+.device-list-scroll {
+    scrollbar-width: thin;
+}
+
+.device-list-scroll-dark {
+    scrollbar-color: #4a4a4a #1f1f1f;
+}
+
+.device-list-scroll-light {
+    scrollbar-color: #b0b0b0 #f3f3f3;
+}
+
+.device-list-scroll::-webkit-scrollbar {
+    width: 10px;
+}
+
+.device-list-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.device-list-scroll-dark::-webkit-scrollbar-track {
+    background: #1f1f1f;
+}
+
+.device-list-scroll-light::-webkit-scrollbar-track {
+    background: #f3f3f3;
+}
+
+.device-list-scroll-dark::-webkit-scrollbar-thumb {
+    background: #4a4a4a;
+    border-radius: 9999px;
+    border: 2px solid #1f1f1f;
+}
+
+.device-list-scroll-light::-webkit-scrollbar-thumb {
+    background: #b0b0b0;
+    border-radius: 9999px;
+    border: 2px solid #f3f3f3;
+}
+
+.device-list-scroll-dark::-webkit-scrollbar-thumb:hover {
+    background: #5a5a5a;
+}
+
+.device-list-scroll-light::-webkit-scrollbar-thumb:hover {
+    background: #9a9a9a;
+}
+
 @keyframes ripple {
     0% {
         box-shadow: 0 0 0 0 var(--ripple-color);
